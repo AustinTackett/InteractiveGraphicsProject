@@ -1,0 +1,10 @@
+^C:\USERS\AUSTIN\DOCUMENTS\SCHOOL\GRAPHICS\INTERACTIVEGRAPHICSPROJECT\BUILD\CMAKEFILES\73C2BE041580E075950D3804A2C0B1A5\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/Austin/Documents/School/Graphics/InteractiveGraphicsProject -BC:/Users/Austin/Documents/School/Graphics/InteractiveGraphicsProject/build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/Users/Austin/Documents/School/Graphics/InteractiveGraphicsProject/build/InteractiveGraphicsProject.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

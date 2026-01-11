@@ -196,7 +196,7 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </ProjectReference>
-    <ProjectReference Include="C:\Users\Austin\Documents\School\Graphics\InteractiveGraphicsProject\build\ALL_BUILD.vcxproj">
+    <ProjectReference Include="C:\Users\Austin\Documents\School\Graphics\InteractiveGraphicsProject\build\external\glew-2.3.0\build\cmake\ALL_BUILD.vcxproj">
       <Project>{94D357AB-E79A-36B9-9510-13D9B21E3495}</Project>
       <Name>ALL_BUILD</Name>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>

@@ -178,13 +178,25 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <Project>{23F675AA-BEC0-3C10-8CAE-B7DBC23D0A8A}</Project>
       <Name>GraphicsProject</Name>
     </ProjectReference>
-    <ProjectReference Include="C:\Users\Austin\Documents\School\Graphics\InteractiveGraphicsProject\build\glew.vcxproj">
+    <ProjectReference Include="C:\Users\Austin\Documents\School\Graphics\InteractiveGraphicsProject\build\external\glew-2.3.0\build\cmake\glew.vcxproj">
       <Project>{6FF151F0-AE02-343D-8096-DC54C89302D3}</Project>
       <Name>glew</Name>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\Austin\Documents\School\Graphics\InteractiveGraphicsProject\build\external\glew-2.3.0\build\cmake\glew_s.vcxproj">
+      <Project>{0F1EC279-2DF1-3918-8BEC-75AF1A30715B}</Project>
+      <Name>glew_s</Name>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\Austin\Documents\School\Graphics\InteractiveGraphicsProject\build\external\glew-2.3.0\build\cmake\glewinfo.vcxproj">
+      <Project>{9F3C2426-260F-38FC-819B-4BDAD035A95B}</Project>
+      <Name>glewinfo</Name>
     </ProjectReference>
     <ProjectReference Include="C:\Users\Austin\Documents\School\Graphics\InteractiveGraphicsProject\build\external\glfw-3.4\src\glfw.vcxproj">
       <Project>{E979ECF2-B055-3AD7-B114-54F9E8847412}</Project>
       <Name>glfw</Name>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\Austin\Documents\School\Graphics\InteractiveGraphicsProject\build\external\glew-2.3.0\build\cmake\visualinfo.vcxproj">
+      <Project>{D1B7BF10-5B9C-3C18-97F0-506BD5C84B5E}</Project>
+      <Name>visualinfo</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

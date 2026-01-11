@@ -10,7 +10,8 @@ add_executable(
 add_subdirectory(external/glfw-3.4)
 target_link_libraries(GraphicsProject PRIVATE glfw)
 
-add_library(glew STATIC external/glew-2.3.0/src/glew.c)
+add_subdirectory(external/glew-2.3.0/build/cmake)
+target_link_libraries(GraphicsProject PRIVATE glew_s)
 target_include_directories(GraphicsProject PRIVATE external/glew-2.3.0/include)
 
 find_package(OpenGL REQUIRED)

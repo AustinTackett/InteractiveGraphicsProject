@@ -35,6 +35,7 @@ endif()
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
   include("C:/Users/Austin/Documents/School/Graphics/InteractiveGraphicsProject/build/external/glfw-3.4/cmake_install.cmake")
+  include("C:/Users/Austin/Documents/School/Graphics/InteractiveGraphicsProject/build/external/glew-2.3.0/build/cmake/cmake_install.cmake")
 
 endif()
 

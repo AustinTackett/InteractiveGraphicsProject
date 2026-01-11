@@ -4,7 +4,8 @@
 		"C:/Users/Austin/Documents/School/Graphics/InteractiveGraphicsProject/build/cmake_install.cmake",
 		"C:/Users/Austin/Documents/School/Graphics/InteractiveGraphicsProject/build/external/glfw-3.4/cmake_install.cmake",
 		"C:/Users/Austin/Documents/School/Graphics/InteractiveGraphicsProject/build/external/glfw-3.4/src/cmake_install.cmake",
-		"C:/Users/Austin/Documents/School/Graphics/InteractiveGraphicsProject/build/external/glfw-3.4/docs/cmake_install.cmake"
+		"C:/Users/Austin/Documents/School/Graphics/InteractiveGraphicsProject/build/external/glfw-3.4/docs/cmake_install.cmake",
+		"C:/Users/Austin/Documents/School/Graphics/InteractiveGraphicsProject/build/external/glew-2.3.0/build/cmake/cmake_install.cmake"
 	],
 	"Parallel" : false
 }
