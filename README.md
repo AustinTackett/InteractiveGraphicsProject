@@ -1,5 +1,10 @@
 # InteractiveGraphicsProject
 
+Set Working Directory
+```console
+cd InteractiveGraphicsProject
+```
+
 Create Build
 ```console
 cmake --preset default 
