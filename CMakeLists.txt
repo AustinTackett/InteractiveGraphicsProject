@@ -13,8 +13,6 @@ target_link_libraries(GraphicsProject PRIVATE glfw)
 add_subdirectory(external/glew-2.3.0/build/cmake)
 target_link_libraries(GraphicsProject PRIVATE glew_s)
 
-//target_include_directories(GraphicsProject PRIVATE external/glew-2.3.0/include)
-
 find_package(OpenGL REQUIRED)
 target_link_libraries(GraphicsProject PRIVATE OpenGL::GL)
 

@@ -159,7 +159,7 @@ target_link_libraries (glew_s ${GLEW_LIBRARIES})
 
 target_compile_definitions(glew_s INTERFACE "GLEW_STATIC")
 foreach(t glew glew_s)
-  target_include_directories(${t} PUBLIC $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+  target_include_directories(${t} PUBLIC $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}> $<BUILD_INTERFACE:${GLEW_DIR}/include>)
 endforeach()
 
 set(targets_to_install "")
