@@ -19,7 +19,7 @@ cmake --build --preset default
 
 Run Project
 ```console
-.\build\Debug\GraphicsProject.exe 
+.\build\Debug\GraphicsProject.exe res/assets/teapot.obj
 ```
 
 As an alternative to cmake commands a batch file provided can call the identical commands, plus additional commands to do multiple instructions, as long as working directory
