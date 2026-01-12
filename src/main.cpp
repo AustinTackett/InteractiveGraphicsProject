@@ -67,23 +67,23 @@ int main(int argc, char** argv)
         return -1;        
     }
 
-    /* Create Vertex Buffer Object */
-    GLuint vBuf;
-    glGenBuffers(1, &vBuf);  
+    /* Create Vertex Buffer Object and Vertex Array Object */
+    GLuint vBuf, vArr;
+    glGenBuffers(1, &vBuf); 
+    glGenVertexArrays(1, &vArr);
+    
+    glBindVertexArray(vArr);
     glBindBuffer(GL_ARRAY_BUFFER, vBuf);
     glBufferData(GL_ARRAY_BUFFER, mesh.NV()*sizeof(cy::Vec3f), &mesh.V(0), GL_STATIC_DRAW);
 
-    /* Create Vertex Array Object */
-    GLuint vArr;
-    glGenVertexArrays(1, &vArr);
-    glBindVertexArray(vArr);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(cy::Vec3f), 0);
     glEnableVertexAttribArray(vArr);
 
     /* Create Shaders */
     GLuint vShader;
     vShader = glCreateShader(GL_VERTEX_SHADER);
-    //glShaderSource()
+    
+    glDrawArrays(GL_TRIANGLES, 0, 3);
 
     /* Seed random number generator*/
     std::srand(1);
@@ -100,8 +100,11 @@ int main(int argc, char** argv)
         }
         timeElapsed = glfwGetTime() - animationStartTime;
 
-        glClearColor(r, g, b, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glBindVertexArray(vArr);
+        glDrawArrays(GL_POINTS, 0, mesh.NV());
+
+        //glClearColor(r, g, b, 1.0f);
+        //glClear(GL_COLOR_BUFFER_BIT);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
