@@ -5,6 +5,9 @@
 #include <fstream>
 #include <string>
 
+#define V_SHADER_PATH "res/shaders/vertShader.glsl"
+#define F_SHADER_PATH "res/shaders/fragShader.glsl"
+
 /* GLFW user input callbacks */
 void keyInput(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
@@ -102,28 +105,24 @@ int main(int argc, char** argv)
     GLuint numVComponents = 3;
     const void* vBuffStartOffset = 0;
     glVertexAttribPointer(vAttribIdx, numVComponents, GL_FLOAT, GL_FALSE, sizeof(cy::Vec3f), vBuffStartOffset);
-    glEnableVertexAttribArray(vArr);
+    glEnableVertexAttribArray(vAttribIdx);
 
     /* Read Vertex Shaders Code From Files */
-    const std::string vShaderPath = "res/shaders/vertShader.glsl";
-
-    std::string vhaderString;
-    bool vShaderFileErr = readFile(vShaderPath, vhaderString);
+    std::string vShaderString;
+    bool vShaderFileErr = readFile(V_SHADER_PATH, vShaderString);
     if (!vShaderFileErr)
     {
-        std::cerr << "Could not load vertex shader at path " << vShaderPath << std::endl;
+        std::cerr << "Could not load vertex shader at path " << V_SHADER_PATH << std::endl;
         glfwTerminate();
         return -1;   
     }
 
     /* Read Fragment Shaders Code From Files */
-    const std::string fShaderPath = "res/shaders/fragShader.glsl";
-
     std::string fShaderString;
-    bool fShaderFileErr = readFile(fShaderPath, fShaderString);
+    bool fShaderFileErr = readFile(F_SHADER_PATH, fShaderString);
     if (!vShaderFileErr)
     {
-        std::cerr << "Could not load fragment shader at path " << fShaderPath << std::endl;
+        std::cerr << "Could not load fragment shader at path " << F_SHADER_PATH << std::endl;
         glfwTerminate();
         return -1;   
     }
@@ -132,7 +131,7 @@ int main(int argc, char** argv)
     GLuint vShader;
     vShader = glCreateShader(GL_VERTEX_SHADER);
 
-    const GLchar* vshaderCharArray = vhaderString.c_str();
+    const GLchar* vshaderCharArray = vShaderString.c_str();
     glShaderSource(vShader, 1, &vshaderCharArray, NULL);
 
     GLint vshaderCompileErr;
@@ -166,7 +165,7 @@ int main(int argc, char** argv)
     glGetShaderiv(fShader, GL_COMPILE_STATUS, &fshaderCompileErr);
     if (!fshaderCompileErr) 
     {
-        glGetShaderInfoLog(fShader, 1024, NULL, &fShaderInfolog[0]);
+        glGetShaderInfoLog(fShader, fInfoLogLength, NULL, &fShaderInfolog[0]);
         std::cerr << "Could not compile fragment shaders\n" << fShaderInfolog << std::endl;
         
         glDeleteShader(vShader);
