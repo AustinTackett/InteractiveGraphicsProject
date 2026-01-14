@@ -9,6 +9,8 @@
 #define V_SHADER_PATH "res/shaders/vertShader.glsl"
 #define F_SHADER_PATH "res/shaders/fragShader.glsl"
 
+void getCursorPos(GLFWwindow* window, double xMousePos, double yMousePos) { }
+
 /* GLFW user input callbacks */
 void getKeyInput(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
@@ -38,6 +40,19 @@ bool readFile(const std::string filePath, std::string& outString)
     }
 
     return true; 
+}
+
+/* Convert Degrees To Radians */
+float deg2Rad(float deg)
+{
+    return deg * (cy::Pi<float>()/180.0f);
+}
+
+/* Get Random Float bewteen 0 and 1 */
+float randFloat() 
+{
+    std::srand(1);
+    return static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
 }
 
 int main(int argc, char** argv) 
@@ -70,7 +85,10 @@ int main(int argc, char** argv)
     glfwMakeContextCurrent(window);
 
     /* Initialize GLFW keyboard callbacks */
+    double xMousesPos = 0;
+    double yMousePos = 0;
     glfwSetKeyCallback(window, getKeyInput);
+    glfwSetCursorPosCallback(window, getCursorPos);
 
     /* Initialize GLEW for using OpenGL functions */
     GLenum glewErr = glewInit();
@@ -205,35 +223,32 @@ int main(int argc, char** argv)
     glDeleteShader(fShader);
 
     /* Calculate MVP */
-    cy::Vec3f xDirection(1, 0, 0);
-    cy::Vec3f yDirection(0, 1, 0);
-    cy::Vec3f zDirection(0, 0, 1);
 
-    // Model Matrix (move to the origin)
-    //cy::Vec3f meshCenter = (mesh.GetBoundMax() + mesh.GetBoundMin())/2;
-    //cy::Vec3f meshTranslation = cy::Vec3f(0, 0, 0) - meshCenter;
-    //cy::Matrix4f modelMatrix = cy::Matrix4f::Translation(meshTranslation);
-    
-    cy::Matrix4f modelMatrix = cy::Matrix4f::Translation(cy::Vec3f(0, 0, 0));
+    // Model Matrix (move mesh center to origin)
+    cy::Vec3f meshCenterTarget = cy::Vec3f(0, 0, 0);
+    cy::Vec3f meshCenter = (mesh.GetBoundMax() + mesh.GetBoundMin())/2;
 
-    // View Matrix
-    cy::Vec3f cameraTarget(cy::Vec3f(0,0,0));
-    cy::Vec3f cameraPosition(-1, -1, 1);
-    cy::Matrix4f viewMatrix = cy::Matrix4f::View(cameraPosition, cameraTarget, yDirection); // Upward in our scene is +y
+    cy::Vec3f meshTranslation = meshCenterTarget - meshCenter;
+    cy::Matrix4f meshRotationX = cy::Matrix4f::RotationX(deg2Rad(-90));
+    cy::Matrix4f modelMatrix = meshRotationX * cy::Matrix4f::Translation(meshTranslation);
+
+    // View Matrix    
+    cy::Matrix4f cameraTranslation = cy::Matrix4f::Translation(cy::Vec3f(0.4f, 0.0f, -3.0f));
+    cy::Matrix4f cameraRotationY = cy::Matrix4f::Identity();
+    cy::Matrix4f viewMatrix = cameraRotationY * cameraTranslation;
     
     // Perspective Matrix
-    float fovRadians = 60.0f * (cy::Pi<float>() / 180.0f);
+    float fovRadians = deg2Rad(60);
     float zFar = 1000;
     float zNear = 0.1f;
     cy::Matrix4f perspectiveMatrix = cy::Matrix4f::Perspective(fovRadians, 1, zNear, zFar);
 
     // Final mvp Matrix
     int numMvps = 1;           // To know how much space to buffer
-    bool mvpTranspose = false; // Would be true if cy::Matrix was row major
+    bool mvpTranspose = false; // Would be true if cy::Matrix was row major instead
     cy::Matrix4f mvp = perspectiveMatrix * viewMatrix * modelMatrix;
 
-    /* Seed random number generator for animating background */
-    std::srand(1);
+    /* Animation Params */
     const double animationDuration = 1.0;
     double timeElapsed = 0.0;
     double animationStartTime = 0.0;
@@ -242,6 +257,7 @@ int main(int argc, char** argv)
     float b = 0.0f;
 
     /* Execute GLFW Window */
+    double relativeMousePosX, relativeMousePosY; // Between 0 (left/bottom) to 1 (right/top)
     glViewport(0, 0, windowWidth, windowHeight);
     glEnable(GL_DEPTH_TEST);
     while (!glfwWindowShouldClose(window))
@@ -250,29 +266,39 @@ int main(int argc, char** argv)
         if (timeElapsed > animationDuration) 
         {
             animationStartTime = glfwGetTime();
-            r = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-            g = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-            b = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+            r = randFloat();
+            g = randFloat();
+            b = randFloat();
         }
         timeElapsed = glfwGetTime() - animationStartTime;
-        //glClearColor(r, g, b, 1.0f);
+        
+        /* Ready Window To Render Obj */
+        glUseProgram(program);
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        //glClearColor(r, g, b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        /* Render Obj */
-        glUseProgram(program);
+        /* Update View Matrix */
+        glfwGetCursorPos(window, &xMousesPos, &yMousePos);
+        relativeMousePosX = xMousesPos / windowWidth;
+        relativeMousePosY = xMousesPos / windowHeight;
+        
+        cy::Matrix4f cameraRotationY = cy::Matrix4f::RotationY(deg2Rad(relativeMousePosX*360));
+        viewMatrix = cameraTranslation * cameraRotationY;
+
+        mvp = perspectiveMatrix * viewMatrix * modelMatrix;
 
         GLint mvpLocation = glGetUniformLocation(program, "mvp");
         glUniformMatrix4fv(mvpLocation, numMvps, mvpTranspose, &mvp.cell[0]);
 
+        /* Draw Obj */
         glBindVertexArray(vArr);
-
         glDrawArrays(GL_POINTS, 0, mesh.NV());
 
+        /* Display Final Render */
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
-
 
     glfwTerminate();
     return 0;
