@@ -1,6 +1,7 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include "cyTriMesh.h"
+#include "cyMatrix.h"
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -9,7 +10,7 @@
 #define F_SHADER_PATH "res/shaders/fragShader.glsl"
 
 /* GLFW user input callbacks */
-void keyInput(GLFWwindow *window, int key, int scancode, int action, int mods)
+void getKeyInput(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
     if (key == GLFW_KEY_ESCAPE) 
     {
@@ -58,8 +59,8 @@ int main(int argc, char** argv)
     }
 
     /* Create a GLFW window */
-    int windowWidth = 640;
-    int windowHeight = 480;
+    int windowWidth = 1280;
+    int windowHeight = 960;
     GLFWwindow* window = glfwCreateWindow(windowWidth, windowHeight, "InteractiveGraphicsProject", NULL, NULL);
     if (!window) {
         std::cerr << "Could not initialize a GLFW window" << std::endl;
@@ -69,7 +70,7 @@ int main(int argc, char** argv)
     glfwMakeContextCurrent(window);
 
     /* Initialize GLFW keyboard callbacks */
-    glfwSetKeyCallback(window, keyInput);
+    glfwSetKeyCallback(window, getKeyInput);
 
     /* Initialize GLEW for using OpenGL functions */
     GLenum glewErr = glewInit();
@@ -197,15 +198,39 @@ int main(int argc, char** argv)
         return -1;      
     }
 
-    /* Assign Uniform Shaders */
-    GLint location = glGetUniformLocation(program,"mvp");
-    //glUniformMatrix4fv()
-
     /* Detach and delete shader objects after they are contained in the program */
     glDetachShader(program, vShader);
     glDetachShader(program, fShader);
     glDeleteShader(vShader);
     glDeleteShader(fShader);
+
+    /* Calculate MVP */
+    cy::Vec3f xDirection(1, 0, 0);
+    cy::Vec3f yDirection(0, 1, 0);
+    cy::Vec3f zDirection(0, 0, 1);
+
+    // Model Matrix (move to the origin)
+    //cy::Vec3f meshCenter = (mesh.GetBoundMax() + mesh.GetBoundMin())/2;
+    //cy::Vec3f meshTranslation = cy::Vec3f(0, 0, 0) - meshCenter;
+    //cy::Matrix4f modelMatrix = cy::Matrix4f::Translation(meshTranslation);
+    
+    cy::Matrix4f modelMatrix = cy::Matrix4f::Translation(cy::Vec3f(0, 0, 0));
+
+    // View Matrix
+    cy::Vec3f cameraTarget(cy::Vec3f(0,0,0));
+    cy::Vec3f cameraPosition(-1, -1, 1);
+    cy::Matrix4f viewMatrix = cy::Matrix4f::View(cameraPosition, cameraTarget, yDirection); // Upward in our scene is +y
+    
+    // Perspective Matrix
+    float fovRadians = 60.0f * (cy::Pi<float>() / 180.0f);
+    float zFar = 1000;
+    float zNear = 0.1f;
+    cy::Matrix4f perspectiveMatrix = cy::Matrix4f::Perspective(fovRadians, 1, zNear, zFar);
+
+    // Final mvp Matrix
+    int numMvps = 1;           // To know how much space to buffer
+    bool mvpTranspose = false; // Would be true if cy::Matrix was row major
+    cy::Matrix4f mvp = perspectiveMatrix * viewMatrix * modelMatrix;
 
     /* Seed random number generator for animating background */
     std::srand(1);
@@ -217,6 +242,8 @@ int main(int argc, char** argv)
     float b = 0.0f;
 
     /* Execute GLFW Window */
+    glViewport(0, 0, windowWidth, windowHeight);
+    glEnable(GL_DEPTH_TEST);
     while (!glfwWindowShouldClose(window))
     {
         /* Animate Background */
@@ -228,12 +255,18 @@ int main(int argc, char** argv)
             b = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
         }
         timeElapsed = glfwGetTime() - animationStartTime;
-        glClearColor(r, g, b, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        //glClearColor(r, g, b, 1.0f);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         /* Render Obj */
         glUseProgram(program);
+
+        GLint mvpLocation = glGetUniformLocation(program, "mvp");
+        glUniformMatrix4fv(mvpLocation, numMvps, mvpTranspose, &mvp.cell[0]);
+
         glBindVertexArray(vArr);
+
         glDrawArrays(GL_POINTS, 0, mesh.NV());
 
         glfwSwapBuffers(window);
