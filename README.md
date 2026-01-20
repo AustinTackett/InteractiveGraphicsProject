@@ -22,7 +22,7 @@ cmake --build build
 .\build\Debug\GraphicsProject.exe res/assets/teapot.obj
 ```
 
-To use another build directory the previous commands can be subsituted with
+To use another build directory the previous commands can be substituted with
 
 ```console
 cmake -B <other-build-directory>
