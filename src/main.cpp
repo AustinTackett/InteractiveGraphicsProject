@@ -1,6 +1,5 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
-#include "cyCore.h"
 #include "cyTriMesh.h"
 #include "cyMatrix.h"
 #include <iostream>
