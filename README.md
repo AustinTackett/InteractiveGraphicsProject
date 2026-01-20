@@ -2,20 +2,32 @@
 
 For intellisense in VScode make sure CMake Tools and C/C++ extensions are installed and enabled
 
-Set Working Directory
+1. Set Working Directory
 ```console
 cd <directory-installed>/InteractiveGraphicsProject
 ```
 
-Create Build System Using CMake
+2. Create Build System Using CMake in Build Directory:
+
 ```console
 cmake -B build 
 ```
-Create Build
+
+3. Create Build With Executable in Build Directory:
 ```console
 cmake --build build
 ```
-Run Project
+4. Run Project Executable and Pass Obj File Path to Render as Argument:
 ```console
 .\build\Debug\GraphicsProject.exe res/assets/teapot.obj
+```
+
+To use another build directory the previous commands can be subsituted with
+
+```console
+cmake -B <other-build-directory>
+
+cmake --build <other-build-directory>
+
+.\<other-build-directory>\Debug\GraphicsProject.exe res/assets/teapot.obj
 ```
