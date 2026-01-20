@@ -18,6 +18,3 @@ target_link_libraries(GraphicsProject PRIVATE cyCodeBase)
 
 find_package(OpenGL REQUIRED)
 target_link_libraries(GraphicsProject PRIVATE OpenGL::GL)
-
-
-
