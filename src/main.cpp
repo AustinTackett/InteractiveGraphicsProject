@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <cmath>
 
 #define V_SHADER_PATH "res/shaders/vertShader.glsl"
 #define F_SHADER_PATH "res/shaders/fragShader.glsl"
@@ -84,7 +85,7 @@ int main(int argc, char** argv)
     glfwMakeContextCurrent(window);
 
     /* Initialize GLFW keyboard callbacks */
-    double xMousesPos = 0;
+    double xMousePos = 0;
     double yMousePos = 0;
     glfwSetKeyCallback(window, getKeyInput);
     glfwSetCursorPosCallback(window, getCursorPos);
@@ -221,36 +222,6 @@ int main(int argc, char** argv)
     glDeleteShader(vShader);
     glDeleteShader(fShader);
 
-    /* Calculate MVP */
-
-    // Model Matrix (move mesh center to origin)
-    cy::Vec3f meshCenterTarget = cy::Vec3f(0, 0, 0);
-    cy::Vec3f meshCenter = (mesh.GetBoundMax() + mesh.GetBoundMin())/2;
-
-    cy::Vec3f meshTranslation = meshCenterTarget - meshCenter;
-    cy::Matrix4f meshRotationX = cy::Matrix4f::RotationX(deg2Rad(-90));
-    cy::Matrix4f modelMatrix = meshRotationX * cy::Matrix4f::Translation(meshTranslation);
-
-    // View Matrix    
-    cy::Matrix4f cameraTranslation = cy::Matrix4f::Translation(cy::Vec3f(0.4f, 0.0f, -3.0f));
-    cy::Matrix4f cameraRotationY = cy::Matrix4f::Identity();
-    cy::Matrix4f viewMatrix = cameraRotationY * cameraTranslation;
-
-    //Vec3f = cameraPosition = cy::Vec3f(0.4f, 0.0f, -3.0f)
-
-    //cy::Vec3f cameraForward = cameraTarget - cameraPosition;
-    
-    // Perspective Matrix
-    float fovRadians = deg2Rad(60);
-    float zFar = 1000;
-    float zNear = 0.1f;
-    cy::Matrix4f perspectiveMatrix = cy::Matrix4f::Perspective(fovRadians, 1, zNear, zFar);
-
-    // Final mvp Matrix
-    int numMvps = 1;           // To know how much space to buffer
-    bool mvpTranspose = false; // Would be true if cy::Matrix was row major instead
-    cy::Matrix4f mvp = perspectiveMatrix * viewMatrix * modelMatrix;
-
     /* Animation Params */
     std::srand(1);
     const double animationDuration = 1.0;
@@ -261,7 +232,7 @@ int main(int argc, char** argv)
     float b = 0.0f;
 
     /* Execute GLFW Window */
-    double relativeMousePosX, relativeMousePosY; // Between 0 (left/bottom) to 1 (right/top)
+    double relativeMousePosX, relativeMousePosY;
     glViewport(0, 0, windowWidth, windowHeight);
     glEnable(GL_DEPTH_TEST);
     while (!glfwWindowShouldClose(window))
@@ -278,20 +249,53 @@ int main(int argc, char** argv)
         
         /* Ready Window To Render Obj */
         glUseProgram(program);
-        //glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        
         glClearColor(r, g, b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        /* Update View Matrix */
-        glfwGetCursorPos(window, &xMousesPos, &yMousePos);
-        relativeMousePosX = xMousesPos / windowWidth;
-        relativeMousePosY = xMousesPos / windowHeight;
+        /* Get Cursor Position */
+        glfwGetCursorPos(window, &xMousePos, &yMousePos); 
+
+        // Could be less than -1 and greater than 1 if mouse leaves window
+        relativeMousePosX = xMousePos / windowWidth;
+        relativeMousePosY = yMousePos / windowHeight;
         
-        cy::Matrix4f cameraRotationY = cy::Matrix4f::RotationY(deg2Rad(static_cast<float>(relativeMousePosX*360)));
-        viewMatrix = cameraTranslation * cameraRotationY;
+        /* Calculate Final MVP Matrix */
 
-        mvp = perspectiveMatrix * viewMatrix * modelMatrix;
+        // Model Matrix (move mesh center to origin)
+        cy::Vec3f origin = cy::Vec3f(0, 0, 0);
+        cy::Matrix4f meshRotationX = cy::Matrix4f::RotationX(deg2Rad(-90));
+        
+        // Account for that rotation changes mesh center
+        cy::Vec3f meshCenter = (mesh.GetBoundMax() + mesh.GetBoundMin())/2; 
+        meshCenter = cy::Vec3f(meshRotationX * cy::Vec4f(meshCenter, 1.0f));
+        cy::Vec3f meshCenterToOrigin = cy::Vec3f(0, origin.y - meshCenter.y, 0);
+        cy::Matrix4f meshTranslation = cy::Matrix4f::Translation(meshCenterToOrigin);
 
+        cy::Matrix4f modelMatrix = meshTranslation * meshRotationX;
+
+        // View Matrix (final matrix not calculated yet)
+        float cameraOffset = 2.0f;
+        float cameraPositionX = cameraOffset * std::cosf(static_cast<float>(relativeMousePosX)*deg2Rad(360)) + origin.x;
+        float cameraPositionZ = cameraOffset * std::sinf(static_cast<float>(relativeMousePosX)*deg2Rad(360)) + origin.z;
+        float cameraPositionY = 0.5;
+        cy::Vec3f cameraPosition(cameraPositionX, cameraPositionY, cameraPositionZ);
+        cy::Vec3f up(0, 1, 0);
+        cy::Matrix4f viewMatrix;
+        viewMatrix.SetView(cameraPosition, origin, up);
+        
+        // Perspective Matrix
+        float aspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
+        float fovRadians = deg2Rad(60);
+        float zFar = 1000;
+        float zNear = 0.1f;
+        cy::Matrix4f perspectiveMatrix = cy::Matrix4f::Perspective(fovRadians, aspect, zNear, zFar);
+
+        // Final MVP Passed as Uniform Value to Shaders
+        cy::Matrix4f mvp = perspectiveMatrix * viewMatrix * modelMatrix;
+
+        int numMvps = 1;           // To know how much space to buffer
+        bool mvpTranspose = false; // Would be true if cy::Matrix was row major instead
         GLint mvpLocation = glGetUniformLocation(program, "mvp");
         glUniformMatrix4fv(mvpLocation, numMvps, mvpTranspose, &mvp.cell[0]);
 
