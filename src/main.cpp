@@ -1,5 +1,6 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include "cyCore.h"
 #include "cyTriMesh.h"
 #include "cyMatrix.h"
 #include <iostream>
@@ -10,16 +11,32 @@
 #define V_SHADER_PATH "res/shaders/vertShader.glsl"
 #define F_SHADER_PATH "res/shaders/fragShader.glsl"
 
-void getCursorPos(GLFWwindow* window, double xMousePos, double yMousePos) { }
+/* GLFW user input callbacks wrapper */
+class UserIO {
+    public:
+        inline static bool leftMouseHeld = false;
 
-/* GLFW user input callbacks */
-void getKeyInput(GLFWwindow *window, int key, int scancode, int action, int mods)
-{
-    if (key == GLFW_KEY_ESCAPE) 
-    {
-        glfwSetWindowShouldClose(window, true);
-    }
-}
+        static void getCursorPos(GLFWwindow* window, double xMousePos, double yMousePos) { }
+
+        static void getMouseButton(GLFWwindow *window, int button, int action, int mods)
+        {
+            if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) 
+            { 
+                leftMouseHeld = true; 
+            }
+            else 
+            { 
+                leftMouseHeld = false; 
+            }
+        }
+
+        static void getKeyInput(GLFWwindow *window, int key, int scancode, int action, int mods)
+        {
+            if (key == GLFW_KEY_ESCAPE) { 
+                glfwSetWindowShouldClose(window, true); 
+            }
+        }
+};
 
 /* Reading Glsl Files */
 bool readFile(const std::string filePath, std::string& outString)
@@ -87,8 +104,9 @@ int main(int argc, char** argv)
     /* Initialize GLFW keyboard callbacks */
     double xMousePos = 0;
     double yMousePos = 0;
-    glfwSetKeyCallback(window, getKeyInput);
-    glfwSetCursorPosCallback(window, getCursorPos);
+    glfwSetKeyCallback(window, UserIO::getKeyInput);
+    glfwSetCursorPosCallback(window, UserIO::getCursorPos);
+    glfwSetMouseButtonCallback(window, UserIO::getMouseButton);
 
     /* Initialize GLEW for using OpenGL functions */
     GLenum glewErr = glewInit();
@@ -232,7 +250,9 @@ int main(int argc, char** argv)
     float b = 0.0f;
 
     /* Execute GLFW Window */
-    double relativeMousePosX, relativeMousePosY;
+    double lastMousePosX, lastMousePosY;
+    double relativeMouseDeltaX, relativeMouseDeltaY;
+    float currentAngleY = 0.0f;
     glViewport(0, 0, windowWidth, windowHeight);
     glEnable(GL_DEPTH_TEST);
     while (!glfwWindowShouldClose(window))
@@ -256,9 +276,19 @@ int main(int argc, char** argv)
         /* Get Cursor Position */
         glfwGetCursorPos(window, &xMousePos, &yMousePos); 
 
-        // Could be less than -1 and greater than 1 if mouse leaves window
-        relativeMousePosX = xMousePos / windowWidth;
-        relativeMousePosY = yMousePos / windowHeight;
+        // Could be less than 0 and greater than 1 if mouse leaves window 
+        if (UserIO::leftMouseHeld)
+        {
+            relativeMouseDeltaX = (xMousePos - lastMousePosX) / windowWidth;  
+            relativeMouseDeltaY = (yMousePos - lastMousePosY) / windowHeight;
+        }
+        else
+        {
+            relativeMouseDeltaX = 0.0;
+            relativeMouseDeltaY = 0.0;
+        }
+        lastMousePosX = xMousePos;
+        lastMousePosY = yMousePos;
         
         /* Calculate Final MVP Matrix */
 
@@ -275,10 +305,12 @@ int main(int argc, char** argv)
         cy::Matrix4f modelMatrix = meshTranslation * meshRotationX;
 
         // View Matrix (final matrix not calculated yet)
-        float cameraOffset = 2.0f;
-        float cameraPositionX = cameraOffset * std::cosf(static_cast<float>(relativeMousePosX)*deg2Rad(360)) + origin.x;
-        float cameraPositionZ = cameraOffset * std::sinf(static_cast<float>(relativeMousePosX)*deg2Rad(360)) + origin.z;
-        float cameraPositionY = 0.5;
+        currentAngleY += static_cast<float>(relativeMouseDeltaX)*deg2Rad(360);
+
+        float cameraOffset = 2;
+        float cameraPositionX = cameraOffset * std::cosf(currentAngleY) + origin.x;
+        float cameraPositionZ = cameraOffset * std::sinf(static_cast<float>(currentAngleY)) + origin.z;
+        float cameraPositionY = 0;
         cy::Vec3f cameraPosition(cameraPositionX, cameraPositionY, cameraPositionZ);
         cy::Vec3f up(0, 1, 0);
         cy::Matrix4f viewMatrix;
@@ -286,7 +318,7 @@ int main(int argc, char** argv)
         
         // Perspective Matrix
         float aspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
-        float fovRadians = deg2Rad(60);
+        float fovRadians = deg2Rad(75);
         float zFar = 1000;
         float zNear = 0.1f;
         cy::Matrix4f perspectiveMatrix = cy::Matrix4f::Perspective(fovRadians, aspect, zNear, zFar);
