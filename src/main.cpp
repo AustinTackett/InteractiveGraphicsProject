@@ -8,7 +8,7 @@
 #include <fstream>
 #include <string>
 #include <cmath>
-#include <algorithm>
+#include <limits>
 
 #define V_SHADER_PATH "res/shaders/vertShader.glsl"
 #define F_SHADER_PATH "res/shaders/fragShader.glsl"
@@ -264,15 +264,16 @@ int main(int argc, char** argv)
     double lastMousePosY = 0.0;
     double relativeMouseDeltaX, relativeMouseDeltaY;
 
-    float currentAngleTheta = deg2Rad(90);
-    float currentAnglePhi = 0.0f;
-    float currentOffset = 3.0;
+    float angleThetaDelta = 0.0f;
+    float anglePhiDelta = 0.0f;
+    
+    float currentRadius = 3.0;
+    float radialSpeed = 2.0;
+    cy::Matrix4f currentOrientation = cy::Matrix4f::Identity();
 
-    cy::Quatf rotationPhi;
-    cy::Quatf rotationTheta;
-
-    cy::Vec3f phiDirection(1, 0, 0);
-    cy::Vec3f thetaDirection(0, 1, 0);
+    cy::Vec3f worldX(1, 0, 0);
+    cy::Vec3f worldY(0, 1, 0);
+    cy::Vec3f worldZ(0, 0, 1);
 
     glViewport(0, 0, windowWidth, windowHeight);
     glEnable(GL_DEPTH_TEST);
@@ -304,51 +305,56 @@ int main(int argc, char** argv)
         lastMousePosY = yMousePos;
         
         /* Calculate Final MVP Matrix */
-        cy::Vec3f meshCenter = (mesh.GetBoundMax() + mesh.GetBoundMin())/2;
 
+        // Model Matrix
+        cy::Vec3f meshCenter = (mesh.GetBoundMax() + mesh.GetBoundMin())/2;
         cy::Matrix4f meshScale = cy::Matrix4f::Scale(cy::Vec3f(0.05f, 0.05f, 0.05f));
         cy::Matrix4f meshRotationX = cy::Matrix4f::RotationX(deg2Rad(-90));
+        cy::Matrix4f meshRotationY = cy::Matrix4f::RotationY(deg2Rad(90));
         cy::Matrix4f meshToOrigin = cy::Matrix4f::Translation(-meshCenter);
-        cy::Matrix4f meshfromOrigin = cy::Matrix4f::Translation(meshCenter);
         
-        cy::Matrix4f modelMatrix = meshRotationX * meshScale * meshToOrigin;
+        cy::Matrix4f modelMatrix = meshRotationY * meshRotationX * meshScale * meshToOrigin;
 
         // View Matrix
-        float angleThetaMaxDeg = 180.0f;
-        float anglePhiMaxDeg = 360.0f;
-        cy::Vec3f cameraTarget(0, 0, 0);
-
         if (UserIO::leftMouseHeld) 
         {
-            currentAngleTheta += static_cast<float>(relativeMouseDeltaY)*deg2Rad(angleThetaMaxDeg);
-            currentAnglePhi += static_cast<float>(relativeMouseDeltaX)*deg2Rad(anglePhiMaxDeg);
+            angleThetaDelta = static_cast<float>(relativeMouseDeltaY)*deg2Rad(360);
+            anglePhiDelta = static_cast<float>(relativeMouseDeltaX)*deg2Rad(360);
+        }
+        else
+        {
+            angleThetaDelta = 0.0f;
+            anglePhiDelta = 0.0f;
         }
         if (UserIO::rightMouseHeld)
         {
-            currentOffset += static_cast<float>(relativeMouseDeltaY);
-            currentOffset = std::max(0.0f, currentOffset);
-        }
-        rotationTheta.SetRotation(currentAngleTheta, thetaDirection);
-        rotationPhi.SetRotation(currentAnglePhi, phiDirection);
-        
-        float cameraPositionX = currentOffset * std::sinf(currentAngleTheta)*std::cosf(currentAnglePhi);
-        float cameraPositionZ = currentOffset * std::sinf(currentAngleTheta)*std::sinf(currentAnglePhi);
-        float cameraPositionY = currentOffset * std::cosf(currentAngleTheta);
+            currentRadius += radialSpeed * static_cast<float>(relativeMouseDeltaY);
+            currentRadius = std::max(0.0f, currentRadius);
+        }        
+        cy::Vec3f thetaDirection = cy::Matrix3f(currentOrientation) * worldX;
+        cy::Vec3f phiDirection = worldY;
 
-        cy::Vec3f cameraPosition(cameraPositionX, cameraPositionY, cameraPositionZ);
-        cy::Matrix4f viewMatrix = cy::Matrix4f::View(cameraPosition, cameraTarget, thetaDirection);
+        cy::Matrix4f rotationTheta = cy::Matrix4f::Rotation(thetaDirection, angleThetaDelta);
+        cy::Matrix4f rotationPhi = cy::Matrix4f::Rotation(phiDirection, anglePhiDelta);
+        currentOrientation = rotationPhi * rotationTheta * currentOrientation;
+
+        cy::Vec3f cameraBackDirection = cy::Matrix3f(currentOrientation) * worldZ;
+        cy::Matrix4f cameraTranslation = cy::Matrix4f::Translation(currentRadius * cameraBackDirection);
+        
+        cy::Matrix4f viewMatrix = (cameraTranslation * currentOrientation).GetInverse();
         
         // Perspective Matrix
         float aspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
         float fovRadians = deg2Rad(75);
         float zFar = 1000;
         float zNear = 0.1f;
+
         cy::Matrix4f perspectiveMatrix = cy::Matrix4f::Perspective(fovRadians, aspect, zNear, zFar);
 
         // Final MVP Passed as Uniform Value to Shaders
         cy::Matrix4f mvp = perspectiveMatrix * viewMatrix * modelMatrix;
 
-        int numMvps = 1;           // To know how much space to buffer
+        int numMvps = 1;           
         bool mvpTranspose = false; // Would be true if cy::Matrix was row major instead
         GLint mvpLocation = glGetUniformLocation(program, "mvp");
         glUniformMatrix4fv(mvpLocation, numMvps, mvpTranspose, &mvp.cell[0]);
