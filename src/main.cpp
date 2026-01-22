@@ -262,12 +262,13 @@ int main(int argc, char** argv)
     /* Execute GLFW Window */
     double lastMousePosX = 0.0;
     double lastMousePosY = 0.0;
-    double relativeMouseDeltaX, relativeMouseDeltaY;
+    double relativeMouseDeltaX = 0.0;
+    double relativeMouseDeltaY = 0.0f;
 
     float angleThetaDelta = 0.0f;
     float anglePhiDelta = 0.0f;
     
-    float currentRadius = 3.0;
+    float currentRadius = 2.0;
     float radialSpeed = 2.0;
     cy::Matrix4f currentOrientation = cy::Matrix4f::Identity();
 
@@ -316,15 +317,12 @@ int main(int argc, char** argv)
         cy::Matrix4f modelMatrix = meshRotationY * meshRotationX * meshScale * meshToOrigin;
 
         // View Matrix
+        angleThetaDelta = 0.0f;
+        anglePhiDelta = 0.0f;
         if (UserIO::leftMouseHeld) 
         {
             angleThetaDelta = static_cast<float>(relativeMouseDeltaY)*deg2Rad(360);
             anglePhiDelta = static_cast<float>(relativeMouseDeltaX)*deg2Rad(360);
-        }
-        else
-        {
-            angleThetaDelta = 0.0f;
-            anglePhiDelta = 0.0f;
         }
         if (UserIO::rightMouseHeld)
         {
@@ -338,17 +336,16 @@ int main(int argc, char** argv)
         cy::Matrix4f rotationPhi = cy::Matrix4f::Rotation(phiDirection, anglePhiDelta);
         currentOrientation = rotationPhi * rotationTheta * currentOrientation;
 
-        cy::Vec3f cameraBackDirection = cy::Matrix3f(currentOrientation) * worldZ;
-        cy::Matrix4f cameraTranslation = cy::Matrix4f::Translation(currentRadius * cameraBackDirection);
+        cy::Vec3f radiusDirection = cy::Matrix3f(currentOrientation) * worldZ;
+        cy::Matrix4f translationRadius = cy::Matrix4f::Translation(currentRadius * radiusDirection);
         
-        cy::Matrix4f viewMatrix = (cameraTranslation * currentOrientation).GetInverse();
+        cy::Matrix4f viewMatrix = (translationRadius * currentOrientation).GetInverse();
         
         // Perspective Matrix
         float aspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
         float fovRadians = deg2Rad(75);
         float zFar = 1000;
         float zNear = 0.1f;
-
         cy::Matrix4f perspectiveMatrix = cy::Matrix4f::Perspective(fovRadians, aspect, zNear, zFar);
 
         // Final MVP Passed as Uniform Value to Shaders
