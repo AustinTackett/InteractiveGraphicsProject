@@ -1,11 +1,14 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include "cyCore.h"
 #include "cyTriMesh.h"
 #include "cyMatrix.h"
+#include "cyQuat.h"
 #include <iostream>
 #include <fstream>
 #include <string>
 #include <cmath>
+#include <algorithm>
 
 #define V_SHADER_PATH "res/shaders/vertShader.glsl"
 #define F_SHADER_PATH "res/shaders/fragShader.glsl"
@@ -14,19 +17,17 @@
 class UserIO {
     public:
         inline static bool leftMouseHeld = false;
+        inline static bool rightMouseHeld = false;
 
         static void getCursorPos(GLFWwindow* window, double xMousePos, double yMousePos) { }
 
         static void getMouseButton(GLFWwindow *window, int button, int action, int mods)
         {
-            if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) 
-            { 
-                leftMouseHeld = true; 
-            }
-            else 
-            { 
-                leftMouseHeld = false; 
-            }
+            if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) { leftMouseHeld = true; }
+            else { leftMouseHeld = false; }
+
+            if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) { rightMouseHeld = true; }
+            else { rightMouseHeld = false; }
         }
 
         static void getKeyInput(GLFWwindow *window, int key, int scancode, int action, int mods)
@@ -35,6 +36,21 @@ class UserIO {
                 glfwSetWindowShouldClose(window, true); 
             }
         }
+};
+
+class RandomFloat {
+    public:
+        RandomFloat() 
+        {
+            std::srand(1);
+        }
+
+        // Generate random float between 0 and 1
+        float getRandomFloat()
+        {
+            return static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+        }
+
 };
 
 /* Reading Glsl Files */
@@ -63,12 +79,6 @@ bool readFile(const std::string filePath, std::string& outString)
 float deg2Rad(float deg)
 {
     return deg * (cy::Pi<float>()/180.0f);
-}
-
-/* Get Random Float bewteen 0 and 1 */
-float randFloat() 
-{
-    return static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
 }
 
 int main(int argc, char** argv) 
@@ -240,7 +250,7 @@ int main(int argc, char** argv)
     glDeleteShader(fShader);
 
     /* Animation Params */
-    std::srand(1);
+    RandomFloat randGen;
     const double animationDuration = 1.0;
     double timeElapsed = 0.0;
     double animationStartTime = 0.0;
@@ -249,71 +259,81 @@ int main(int argc, char** argv)
     float b = 0.0f;
 
     /* Execute GLFW Window */
-    double lastMousePosX, lastMousePosY;
+    double lastMousePosX = 0.0;
+    double lastMousePosY = 0.0;
     double relativeMouseDeltaX, relativeMouseDeltaY;
-    float currentAngleY = 0.0f;
+
+    float currentAngleTheta = deg2Rad(90);
+    float currentAnglePhi = 0.0f;
+    float currentOffset = 3.0;
+
     glViewport(0, 0, windowWidth, windowHeight);
     glEnable(GL_DEPTH_TEST);
+
     while (!glfwWindowShouldClose(window))
     {
         /* Animate Background */
         if (timeElapsed > animationDuration) 
         {
             animationStartTime = glfwGetTime();
-            r = randFloat();
-            g = randFloat();
-            b = randFloat();
+            r = randGen.getRandomFloat();
+            g = randGen.getRandomFloat();
+            b = randGen.getRandomFloat();
         }
         timeElapsed = glfwGetTime() - animationStartTime;
         
         /* Ready Window To Render Obj */
         glUseProgram(program);
         
-        glClearColor(r, g, b, 1.0f);
+        //glClearColor(r, g, b, 1.0f);
+        glClearColor(0, 0, 0, 1.0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         /* Get Cursor Position */
         glfwGetCursorPos(window, &xMousePos, &yMousePos); 
 
-        // Could be less than 0 and greater than 1 if mouse leaves window 
-        if (UserIO::leftMouseHeld)
-        {
-            relativeMouseDeltaX = (xMousePos - lastMousePosX) / windowWidth;  
-            relativeMouseDeltaY = (yMousePos - lastMousePosY) / windowHeight;
-        }
-        else
-        {
-            relativeMouseDeltaX = 0.0;
-            relativeMouseDeltaY = 0.0;
-        }
+        // Calculate Change in Mouse Position
+        relativeMouseDeltaX = (xMousePos - lastMousePosX) / windowWidth;  
+        relativeMouseDeltaY = (yMousePos - lastMousePosY) / windowHeight;
         lastMousePosX = xMousePos;
         lastMousePosY = yMousePos;
         
         /* Calculate Final MVP Matrix */
 
         // Model Matrix (move mesh center to origin)
-        cy::Vec3f origin = cy::Vec3f(0, 0, 0);
         cy::Matrix4f meshRotationX = cy::Matrix4f::RotationX(deg2Rad(-90));
         
         // Account for that rotation changes mesh center
         cy::Vec3f meshCenter = (mesh.GetBoundMax() + mesh.GetBoundMin())/2; 
         meshCenter = cy::Vec3f(meshRotationX * cy::Vec4f(meshCenter, 1.0f));
-        cy::Vec3f meshCenterToOrigin = cy::Vec3f(0, origin.y - meshCenter.y, 0);
-        cy::Matrix4f meshTranslation = cy::Matrix4f::Translation(meshCenterToOrigin);
+        cy::Vec3f meshCenterToOrigin = cy::Vec3f(0, -meshCenter.y, 0);
 
+        cy::Matrix4f meshTranslation = cy::Matrix4f::Translation(meshCenterToOrigin);
         cy::Matrix4f modelMatrix = meshTranslation * meshRotationX;
 
-        // View Matrix (final matrix not calculated yet)
-        currentAngleY += static_cast<float>(relativeMouseDeltaX)*deg2Rad(360);
-
-        float cameraOffset = 2;
-        float cameraPositionX = cameraOffset * std::cosf(currentAngleY) + origin.x;
-        float cameraPositionZ = cameraOffset * std::sinf(static_cast<float>(currentAngleY)) + origin.z;
-        float cameraPositionY = 0;
-        cy::Vec3f cameraPosition(cameraPositionX, cameraPositionY, cameraPositionZ);
+        // View Matrix
+        float angleThetaMaxDeg = 180.0f;
+        float anglePhiMaxDeg = 360.0f;
         cy::Vec3f up(0, 1, 0);
-        cy::Matrix4f viewMatrix;
-        viewMatrix.SetView(cameraPosition, origin, up);
+        cy::Vec3f cameraTarget(0, 0, 0);
+
+        if (UserIO::leftMouseHeld) 
+        {
+            currentAngleTheta += static_cast<float>(relativeMouseDeltaY)*deg2Rad(angleThetaMaxDeg);
+            currentAnglePhi += static_cast<float>(relativeMouseDeltaX)*deg2Rad(anglePhiMaxDeg);
+        }
+        if (UserIO::rightMouseHeld)
+        {
+            currentOffset += static_cast<float>(relativeMouseDeltaY);
+            currentOffset = std::max(0.0f, currentOffset);
+        }
+
+        float cameraPositionX = currentOffset * std::sinf(currentAngleTheta)*std::cosf(currentAnglePhi);
+        float cameraPositionZ = currentOffset * std::sinf(currentAngleTheta)*std::sinf(currentAnglePhi);
+        float cameraPositionY = currentOffset * std::cosf(currentAngleTheta);
+        cy::Vec3f cameraPosition(cameraPositionX, cameraPositionY, cameraPositionZ);
+
+        cy::Matrix4f viewMatrix = cy::Matrix4f::View(cameraPosition, cameraTarget, up);
         
         // Perspective Matrix
         float aspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
