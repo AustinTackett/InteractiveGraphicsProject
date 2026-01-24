@@ -197,16 +197,26 @@ int main(int argc, char** argv)
     const void* posOffset = 0;
     GLuint vao;
     GLuint vbo;
+    GLuint ebo;
     GLenum usage = GL_STATIC_DRAW;
+    
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
+    
     glGenBuffers(1, &vbo); 
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glBufferData(GL_ARRAY_BUFFER, mesh.NV()*sizeof(cy::Vec3f), &mesh.V(0), usage);
+
+    glGenBuffers(1, &ebo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.NF()*3*sizeof(cy::TriMesh::TriFace), &mesh.F(0), usage);
+    
     glVertexAttribPointer(posLocation, 3, GL_FLOAT, GL_FALSE, sizeof(cy::Vec3f), posOffset);
     glEnableVertexAttribArray(posLocation);
+
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);  
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
     /* Execute GLFW Window */
     float thetaDelta = 0.0f;
@@ -271,6 +281,8 @@ int main(int argc, char** argv)
         program.SetUniformMatrix4("mvp", &mvp.cell[0]);
         glBindVertexArray(vao);
         glDrawArrays(GL_POINTS, 0, mesh.NV());
+        //glDrawElements(GL_TRIANGLES, mesh.NF()*3, GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
 
         /* Display Final Render */
         glfwSwapBuffers(window);
