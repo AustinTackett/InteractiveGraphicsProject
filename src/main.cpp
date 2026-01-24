@@ -7,8 +7,8 @@
 #include <fstream>
 #include <string>
 
-#define V_SHADER_PATH "res/shaders/vertShader.vert"
-#define F_SHADER_PATH "res/shaders/fragShader.frag"
+constexpr const char* V_SHADER_PATH = "res/shaders/vertShader.vert";
+constexpr const char* F_SHADER_PATH = "res/shaders/fragShader.frag";
 
 /* Convert Degrees To Radians */
 float deg2Rad(float deg) { return deg * (cy::Pi<float>()/180.0f); }
@@ -18,6 +18,7 @@ class UserIO {
     public:
         inline static bool leftMouseHeld = false;
         inline static bool rightMouseHeld = false;
+        inline static bool recompileShaders = false;
         inline static double xMousePosDelta = 0.0;
         inline static double yMousePosDelta = 0.0;
         inline static double xRelativeMousePosDelta = 0.0;
@@ -56,14 +57,15 @@ class UserIO {
         static void getMouseButton(GLFWwindow *window, int button, int action, int mods)
         {
             if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) { leftMouseHeld = true; }
-            else { leftMouseHeld = false; }
+            else if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) { leftMouseHeld = false; }
 
             if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) { rightMouseHeld = true; }
-            else { rightMouseHeld = false; }
+            else if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_RELEASE) { rightMouseHeld = false; }
         }
         static void getKeyInput(GLFWwindow *window, int key, int scancode, int action, int mods)
         {
-            if (key == GLFW_KEY_ESCAPE) { glfwSetWindowShouldClose(window, true); }
+            if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) { glfwSetWindowShouldClose(window, true); }
+            if (key == GLFW_KEY_F6 && action == GLFW_PRESS) { recompileShaders = true; }
         }
 };
 
@@ -98,8 +100,6 @@ class Camera{
 class AnimatedRGB {
     public:
         const double animationDuration = 1.0;
-        double timeElapsed = 0.0;
-        double animationStartTime = 0.0;
         float r = 1.0f;
         float g = 0.0f;
         float b = 0.0f;
@@ -113,15 +113,20 @@ class AnimatedRGB {
         }
         void pollAnimation()
         {
-            if (timeElapsed > animationDuration) 
+            if (_timeElapsed > animationDuration) 
             {
-                animationStartTime = glfwGetTime();
+                _animationStartTime = glfwGetTime();
                 r = getRandomFloat();
                 g = getRandomFloat();
                 b = getRandomFloat();
             }
-            timeElapsed = glfwGetTime() - animationStartTime;
+            _timeElapsed = glfwGetTime() - _animationStartTime;
         }
+
+    private:
+        double _timeElapsed = 0.0;
+        double _animationStartTime = 0.0;
+
 };
 
 int main(int argc, char** argv) 
@@ -215,7 +220,7 @@ int main(int argc, char** argv)
     Camera camera;
     AnimatedRGB animatedRgb;
     UserIO::Init(window);
-    glViewport(0, 0, windowWidth, windowHeight);
+
     glEnable(GL_DEPTH_TEST);
 
     while (!glfwWindowShouldClose(window))
@@ -224,8 +229,18 @@ int main(int argc, char** argv)
         //animatedRgb.pollAnimation();
         //glClearColor(animatedRgb.r, animatedRgb.g, animatedRgb.b, 1.0); 
 
+        glfwGetWindowSize(window, &windowWidth, &windowHeight);
+        glViewport(0, 0, windowWidth, windowHeight);
         glClearColor(0, 0, 0, 1.0); 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        if (UserIO::recompileShaders)
+        {
+            bool shaderIsReady = program.BuildFiles(V_SHADER_PATH, F_SHADER_PATH);
+            if (shaderIsReady) { std::cout << "Shaders recompiled successfully" << std::endl; }
+            else { glfwSetWindowShouldClose(window, true); }
+            UserIO::recompileShaders = false;
+        }
 
         // View Matrix
         UserIO::PollMousePos();
@@ -250,10 +265,10 @@ int main(int argc, char** argv)
 
         // Final MVP Passed as Uniform Value to Shaders
         cy::Matrix4f mvp = perspectiveMatrix * viewMatrix * modelMatrix;
-        program.SetUniformMatrix4("mvp", &mvp.cell[0]);
 
         /* Bind Program and Draw */
         program.Bind();
+        program.SetUniformMatrix4("mvp", &mvp.cell[0]);
         glBindVertexArray(vao);
         glDrawArrays(GL_POINTS, 0, mesh.NV());
 
