@@ -29,6 +29,7 @@ class UserIO {
         static void Init(GLFWwindow* window)
         {
             _window = window;
+            glfwGetWindowSize(window, &_windowWidth, &_windowHeight);
             glfwSetKeyCallback(window, getKeyInput);
             glfwSetCursorPosCallback(window, getCursorPos);
             glfwSetMouseButtonCallback(window, getMouseButton);
@@ -172,6 +173,7 @@ int main(int argc, char** argv)
     if (!shaderIsReady)
     {
         glfwTerminate();
+        std::cerr << "Failed to compile shaders" << std::endl;
         return -1;          
     }
 
@@ -209,7 +211,7 @@ int main(int argc, char** argv)
 
     glGenBuffers(1, &ebo);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.NF()*3*sizeof(cy::TriMesh::TriFace), &mesh.F(0), usage);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.NF()*sizeof(cy::TriMesh::TriFace), &mesh.F(0), usage);
     
     glVertexAttribPointer(posLocation, 3, GL_FLOAT, GL_FALSE, sizeof(cy::Vec3f), posOffset);
     glEnableVertexAttribArray(posLocation);
@@ -246,9 +248,10 @@ int main(int argc, char** argv)
 
         if (UserIO::recompileShaders)
         {
+            // cmpile
             bool shaderIsReady = program.BuildFiles(V_SHADER_PATH, F_SHADER_PATH);
             if (shaderIsReady) { std::cout << "Shaders recompiled successfully" << std::endl; }
-            else { glfwSetWindowShouldClose(window, true); }
+            else { std::cerr << "Failed to recompile shaders" << std::endl; glfwSetWindowShouldClose(window, true); }
             UserIO::recompileShaders = false;
         }
 
@@ -280,8 +283,8 @@ int main(int argc, char** argv)
         program.Bind();
         program.SetUniformMatrix4("mvp", &mvp.cell[0]);
         glBindVertexArray(vao);
-        glDrawArrays(GL_POINTS, 0, mesh.NV());
-        //glDrawElements(GL_TRIANGLES, mesh.NF()*3, GL_UNSIGNED_INT, 0);
+        //glDrawArrays(GL_POINTS, 0, mesh.NV());
+        glDrawElements(GL_POINTS, mesh.NF()*3, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
 
         /* Display Final Render */
