@@ -3,6 +3,7 @@
 #include "cyGL.h"
 #include "cyTriMesh.h"
 #include "cyMatrix.h"
+#include "cyQuat.h"
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -77,24 +78,30 @@ class Camera{
         cy::Vec3f worldX = cy::Vec3f(1, 0, 0);
         cy::Vec3f worldY = cy::Vec3f(0, 1, 0);
         cy::Vec3f worldZ = cy::Vec3f(0, 0, 1);
-        cy::Matrix4f currentOrientation = cy::Matrix4f::Identity();
-        cy::Matrix4f currentPosition = cy::Matrix4f::Identity();
+        cy::Quatf currentOrientation = cy::Quatf(1, 0, 0, 0);
+        cy::Vec3f currentPosition = cy::Vec3f(0, 0, radius);
     
         void update(float phiDelta, float thetaDelta, float radiusDelta)
         {
-            cy::Vec3f thetaDirection = cy::Matrix3f(currentOrientation) * worldX;
+            cy::Vec3f radiusDirection = (currentOrientation.ToMatrix3() * worldZ).GetNormalized();
+            cy::Vec3f thetaDirection = (currentOrientation.ToMatrix3() * worldX).GetNormalized();
             cy::Vec3f phiDirection = worldY;
-            cy::Matrix4f rotationTheta = cy::Matrix4f::Rotation(thetaDirection, thetaDelta);
-            cy::Matrix4f rotationPhi = cy::Matrix4f::Rotation(phiDirection, phiDelta);
+            
+            cy::Quatf rotationTheta;
+            cy::Quatf rotationPhi;
+            rotationTheta.SetRotation(thetaDelta, thetaDirection);
+            rotationPhi.SetRotation(phiDelta, phiDirection);
             currentOrientation = rotationPhi * rotationTheta * currentOrientation;
+            currentOrientation.Normalize();
 
             radius = cy::Max(0.0f, radialSpeed*radiusDelta + radius);
-            cy::Vec3f radiusDirection = cy::Matrix3f(currentOrientation) * worldZ;
-            currentPosition = cy::Matrix4f::Translation(radius*radiusDirection);
+            currentPosition = radius*radiusDirection;
         }
         cy::Matrix4f getViewMatrix()
         {
-            return (currentPosition * currentOrientation).GetInverse();
+            cy::Matrix4f positionTranslation = cy::Matrix4f::Translation(currentPosition);
+            cy::Matrix4f orientationRotation = currentOrientation.ToMatrix4();
+            return (positionTranslation * orientationRotation).GetInverse();
         }
 };
 
