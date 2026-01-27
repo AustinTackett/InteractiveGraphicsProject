@@ -83,7 +83,6 @@ class Camera{
     
         void update(float phiDelta, float thetaDelta, float radiusDelta)
         {
-            cy::Vec3f radiusDirection = (currentOrientation.ToMatrix3() * worldZ).GetNormalized();
             cy::Vec3f thetaDirection = (currentOrientation.ToMatrix3() * worldX).GetNormalized();
             cy::Vec3f phiDirection = worldY;
             
@@ -94,6 +93,7 @@ class Camera{
             currentOrientation = rotationPhi * rotationTheta * currentOrientation;
             currentOrientation.Normalize();
 
+            cy::Vec3f radiusDirection = (currentOrientation.ToMatrix3() * worldZ).GetNormalized();
             radius = cy::Max(0.0f, radialSpeed*radiusDelta + radius);
             currentPosition = radius*radiusDirection;
         }
