@@ -10,7 +10,7 @@ cd <directory-installed>/InteractiveGraphicsProject
 2. Create Build System Using CMake in Build Directory:
 
 ```console
-cmake -B build 
+cmake --build build
 ```
 
 3. Create Build With Executable in Build Directory:

@@ -1,12 +1,14 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <filesystem>
 #include "cyGL.h"
 #include "cyTriMesh.h"
 #include "cyMatrix.h"
 #include "cyQuat.h"
-#include <iostream>
-#include <fstream>
-#include <string>
+#include "lodepng.h"
 
 constexpr const char* V_SHADER_PATH = "res/shaders/vertShader.vert";
 constexpr const char* F_SHADER_PATH = "res/shaders/fragShader.frag";
@@ -20,6 +22,7 @@ class UserIO {
         inline static bool leftMouseHeld = false;
         inline static bool rightMouseHeld = false;
         inline static bool recompileShaders = false;
+        inline static bool controlPressed = false;
         inline static double xMousePosDelta = 0.0;
         inline static double yMousePosDelta = 0.0;
         inline static double xRelativeMousePosDelta = 0.0;
@@ -68,10 +71,12 @@ class UserIO {
         {
             if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) { glfwSetWindowShouldClose(window, true); }
             if (key == GLFW_KEY_F6 && action == GLFW_PRESS) { recompileShaders = true; }
+            if ( (key == GLFW_KEY_LEFT_CONTROL || key == GLFW_KEY_LEFT_CONTROL) && action == GLFW_PRESS) { controlPressed = true; }
+            else if ( (key == GLFW_KEY_LEFT_CONTROL || key == GLFW_KEY_LEFT_CONTROL) && action == GLFW_RELEASE ) { controlPressed = false; }
         }
 };
 
-class Camera{
+class OrbitalObject {
     public:
         float radius = 3.0;
         float radialSpeed = 2.0;
@@ -103,39 +108,14 @@ class Camera{
             cy::Matrix4f orientationRotation = currentOrientation.ToMatrix4();
             return (positionTranslation * orientationRotation).GetInverse();
         }
+        cy::Matrix4f getModelMatrix()
+        {
+            cy::Matrix4f positionTranslation = cy::Matrix4f::Translation(currentPosition);
+            cy::Matrix4f orientationRotation = currentOrientation.ToMatrix4();
+            return (positionTranslation * orientationRotation);
+        }
 };
 
-class AnimatedRGB {
-    public:
-        const double animationDuration = 1.0;
-        float r = 1.0f;
-        float g = 0.0f;
-        float b = 0.0f;
-
-        AnimatedRGB(int seed = 1) { std::srand(seed); }
-
-        // Generate random float between 0 and 1
-        float getRandomFloat()
-        {
-            return static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
-        }
-        void pollAnimation()
-        {
-            if (_timeElapsed > animationDuration) 
-            {
-                _animationStartTime = glfwGetTime();
-                r = getRandomFloat();
-                g = getRandomFloat();
-                b = getRandomFloat();
-            }
-            _timeElapsed = glfwGetTime() - _animationStartTime;
-        }
-
-    private:
-        double _timeElapsed = 0.0;
-        double _animationStartTime = 0.0;
-
-};
 
 int main(int argc, char** argv) 
 {
@@ -145,7 +125,7 @@ int main(int argc, char** argv)
         std::cerr << "A single argument of a path to a obj file is expected" << std::endl;
         return -1;
     }
-    std::string objFilePath(argv[1]);
+    std::filesystem::path objFilePath(argv[1]);
 
     /* Initialize a GLFW Window */
     int glfwErrorCode = glfwInit();
@@ -186,13 +166,26 @@ int main(int argc, char** argv)
 
     /* Parse Mesh from File and Prepare Model Matrix from Mesh Bounding Box */
     cy::TriMesh mesh;
-    bool meshIsReady = mesh.LoadFromFileObj(objFilePath.c_str());
+    bool meshIsReady = mesh.LoadFromFileObj(objFilePath.string().c_str(), true);
     if (!meshIsReady)
     {
-        std::cerr << "Could not load mesh from obj file at path " << objFilePath << std::endl;
+        std::cerr << "Could not load mesh from obj file at path: " << objFilePath << std::endl;
         glfwTerminate();
         return -1;        
     }
+    if ( !(mesh.HasNormals() && mesh.HasTextureVertices()) )
+    {
+        std::cerr << "Could find vertex normal or vertex texture uv's at: " << objFilePath << std::endl;
+        glfwTerminate();
+        return -1;        
+    }
+    if ( mesh.NM() == 0)
+    {
+        std::cerr << "Count not find at least one .mtl file in the same directory as: " << objFilePath << std::endl;
+        glfwTerminate();
+        return -1;        
+    }
+
     mesh.ComputeBoundingBox();
     cy::Vec3f meshCenter = (mesh.GetBoundMax() + mesh.GetBoundMin())/2;
     cy::Matrix4f meshScale = cy::Matrix4f::Scale(cy::Vec3f(0.05f, 0.05f, 0.05f));
@@ -201,53 +194,123 @@ int main(int argc, char** argv)
     cy::Matrix4f meshToOrigin = cy::Matrix4f::Translation(-meshCenter);
     cy::Matrix4f modelMatrix = meshRotationY * meshRotationX * meshScale * meshToOrigin;
 
+    /* Load Textures */
+    std::filesystem::path diffuseTextureFilePath = objFilePath.parent_path() / std::filesystem::path(mesh.M(0).map_Kd.data);
+    std::vector<unsigned char> diffuseTextureData; 
+    unsigned diffuseTextureWidth, diffuseTextureHeight;
+    unsigned pngLodeErrorDiffuse = lodepng::decode(diffuseTextureData, diffuseTextureWidth, diffuseTextureHeight, diffuseTextureFilePath.string());
+    if(pngLodeErrorDiffuse)
+    {
+        std::cerr << "Attempted to find diffuse texture at according to .mtl file: " << diffuseTextureFilePath.string() << std::endl;
+        std::cerr << "Could not load diffuse texture: " << pngLodeErrorDiffuse << ": " << lodepng_error_text(pngLodeErrorDiffuse) << std::endl;
+        glfwTerminate();
+        return -1;       
+    }
+    std::filesystem::path specularTextureFilePath = objFilePath.parent_path() / std::filesystem::path(mesh.M(0).map_Ks.data);
+    std::vector<unsigned char> specularTextureData; 
+    unsigned specularTextureWidth, specularTextureHeight;
+    unsigned pngLodeErrorSpecular = lodepng::decode(specularTextureData, specularTextureWidth, specularTextureHeight, specularTextureFilePath.string());
+    if(pngLodeErrorSpecular)
+    {
+        std::cerr << "Attempted to find specular texture at according to .mtl file: " << specularTextureFilePath.string() << std::endl;
+        std::cerr << "Could not load specular texture: " << pngLodeErrorSpecular << ": " << lodepng_error_text(pngLodeErrorSpecular) << std::endl;
+        glfwTerminate();
+        return -1;       
+    }
+
     /* Write Mesh to GPU */
-    GLuint posLocation = 0;
-    const void* posOffset = 0;
+    std::vector<cy::Vec3f> positions( mesh.NF()*3 );
+    std::vector<cy::Vec3f> normals( mesh.NF()*3 );
+    std::vector<cy::Vec3f> uvs( mesh.NF()*3 );
+
+    // For each face find the vertices, normals, and uvs and put them in lists ordered by face index
+    for (unsigned int faceIndex = 0; faceIndex < mesh.NF(); faceIndex++)
+    {
+        cy::TriMesh::TriFace facePositions = mesh.F(faceIndex);
+        cy::TriMesh::TriFace faceNormals = mesh.FN(faceIndex);
+        cy::TriMesh::TriFace faceUvs = mesh.FT(faceIndex);
+        for (int indexOnFace = 0; indexOnFace < 3; indexOnFace++)
+        {
+            unsigned int vertexPositionIndex = facePositions.v[indexOnFace];
+            unsigned int vertexNormalIndex = faceNormals.v[indexOnFace];
+            unsigned int vertexUvIndex = faceUvs.v[indexOnFace];
+
+            positions.push_back( mesh.V(vertexPositionIndex) );
+            normals.push_back( mesh.VN(vertexNormalIndex) );
+            uvs.push_back( mesh.VT(vertexUvIndex) );
+        }    
+    }
+
     GLuint vao;
-    GLuint vbo;
-    GLuint ebo;
-    GLenum usage = GL_STATIC_DRAW;
-    
+    GLuint positionBuffer;
+    GLuint normalBuffer;
+    GLuint uvBuffer;
+    GLuint positionLocation = 0;
+    GLuint normalLocation = 1;
+    GLuint uvLocation = 2;
+
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
     
-    glGenBuffers(1, &vbo); 
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, mesh.NV()*sizeof(cy::Vec3f), &mesh.V(0), usage);
+    glGenBuffers(1, &positionBuffer); 
+    glBindBuffer(GL_ARRAY_BUFFER, positionBuffer);
+    glBufferData(GL_ARRAY_BUFFER, positions.size()*sizeof(cy::Vec3f), positions.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(positionLocation, 3, GL_FLOAT, GL_FALSE, sizeof(cy::Vec3f), 0);
+    glEnableVertexAttribArray(positionLocation);
 
-    glGenBuffers(1, &ebo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.NF()*sizeof(cy::TriMesh::TriFace), &mesh.F(0), usage);
+    glGenBuffers(1, &normalBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, normalBuffer);
+    glBufferData(GL_ARRAY_BUFFER, normals.size()*sizeof(cy::Vec3f), normals.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(normalLocation, 3, GL_FLOAT, GL_FALSE, sizeof(cy::Vec3f), 0);
+    glEnableVertexAttribArray(normalLocation);
+
+    glGenBuffers(1, &uvBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, uvBuffer);
+    glBufferData(GL_ARRAY_BUFFER, uvs.size()*sizeof(cy::Vec3f), uvs.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(uvLocation, 3, GL_FLOAT, GL_FALSE, sizeof(cy::Vec3f), 0);
+    glEnableVertexAttribArray(uvLocation);
     
-    glVertexAttribPointer(posLocation, 3, GL_FLOAT, GL_FALSE, sizeof(cy::Vec3f), posOffset);
-    glEnableVertexAttribArray(posLocation);
-
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);  
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-    /* Execute GLFW Window */
-    float thetaDelta = 0.0f;
-    float phiDelta = 0.0f;
-    float radiusDelta = 0.0f;
+    /* Write Textures to GPU */
+    cy::GLTexture2D texDiffuse;
+    int texDiffuseUnit = 1;
+    texDiffuse.Initialize();
+    texDiffuse.SetImage<unsigned char>(&diffuseTextureData[0], 4, diffuseTextureWidth, diffuseTextureHeight);
+    texDiffuse.BuildMipmaps();
+
+    cy::GLTexture2D texSpecular;
+    int texSpecularUnit = 2;
+    texSpecular.Initialize();
+    texSpecular.SetImage<unsigned char>(&specularTextureData[0], 4, specularTextureWidth, specularTextureHeight);
+    texSpecular.BuildMipmaps();
+    
+    cy::GLTexture2D texAmbient;
+    int texAmbientUnit = 3;
+    texAmbient.Initialize();
+    texAmbient.SetImage<unsigned char>(&diffuseTextureData[0], 4, diffuseTextureWidth, diffuseTextureHeight);
+    texAmbient.BuildMipmaps();
+
+    
+
+    /* Data on Scene */
+    OrbitalObject camera;
+    OrbitalObject light;
 
     float fovRadians = deg2Rad(75);
     float zFar = 1000;
     float zNear = 0.1f;
 
-    Camera camera;
-    AnimatedRGB animatedRgb;
+    float lightIntensity = 1.0f;
+    float lightAmbientIntensity = 0.1f;
+
+    /* Execute GLFW Window */
     UserIO::Init(window);
-
     glEnable(GL_DEPTH_TEST);
-
     while (!glfwWindowShouldClose(window))
     {        
-        // Animated Background (disabled b/c distracting)        
-        //animatedRgb.pollAnimation();
-        //glClearColor(animatedRgb.r, animatedRgb.g, animatedRgb.b, 1.0); 
-
         glfwGetWindowSize(window, &windowWidth, &windowHeight);
         glViewport(0, 0, windowWidth, windowHeight);
         glClearColor(0, 0, 0, 1.0); 
@@ -255,7 +318,6 @@ int main(int argc, char** argv)
 
         if (UserIO::recompileShaders)
         {
-            // cmpile
             bool shaderIsReady = program.BuildFiles(V_SHADER_PATH, F_SHADER_PATH);
             if (shaderIsReady) { std::cout << "Shaders recompiled successfully" << std::endl; }
             else { std::cerr << "Failed to recompile shaders" << std::endl; glfwSetWindowShouldClose(window, true); }
@@ -264,34 +326,67 @@ int main(int argc, char** argv)
 
         // View Matrix
         UserIO::PollMousePos();
-        thetaDelta = 0.0f;
-        phiDelta = 0.0f;
-        radiusDelta = 0.0f;
-        if (UserIO::leftMouseHeld) 
+        float thetaDelta = 0.0f;
+        float phiDelta = 0.0f;
+        float radiusDelta = 0.0f;
+        if (UserIO::leftMouseHeld && !UserIO::controlPressed) 
         {
             thetaDelta = static_cast<float>(UserIO::yRelativeMousePosDelta)*(2*cy::Pi<float>());
             phiDelta = static_cast<float>(UserIO::xRelativeMousePosDelta)*(2*cy::Pi<float>());
         }
-        if (UserIO::rightMouseHeld)
+        if (UserIO::rightMouseHeld && !UserIO::controlPressed)
         {
             radiusDelta = static_cast<float>(UserIO::yRelativeMousePosDelta);
         }        
         camera.update(phiDelta, thetaDelta, radiusDelta);
         cy::Matrix4f viewMatrix = camera.getViewMatrix();
         
+        if (UserIO::leftMouseHeld && UserIO::controlPressed) 
+        {
+            thetaDelta = static_cast<float>(UserIO::yRelativeMousePosDelta)*(2*cy::Pi<float>());
+            phiDelta = static_cast<float>(UserIO::xRelativeMousePosDelta)*(2*cy::Pi<float>());
+        }
+        if (UserIO::rightMouseHeld && UserIO::controlPressed)
+        {
+            radiusDelta = static_cast<float>(UserIO::yRelativeMousePosDelta);
+        }        
+        light.update(phiDelta, thetaDelta, radiusDelta);
+
         // Perspective Matrix
         float aspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
         cy::Matrix4f perspectiveMatrix = cy::Matrix4f::Perspective(fovRadians, aspect, zNear, zFar);
 
         // Final MVP Passed as Uniform Value to Shaders
         cy::Matrix4f mvp = perspectiveMatrix * viewMatrix * modelMatrix;
+        cy::Matrix4f mv = viewMatrix * modelMatrix;
+        cy::Matrix3f mvNormal = cy::Matrix3f(viewMatrix * modelMatrix).GetInverse().GetTranspose();
+        cy::Vec3f lightPositionView = cy::Vec3f( viewMatrix * cy::Vec4f(light.currentPosition, 1.0) );
 
-        /* Bind Program and Draw */
+        /* Bind Program and Uniforms then Draw */
         program.Bind();
+        
         program.SetUniformMatrix4("mvp", &mvp.cell[0]);
+        program.SetUniformMatrix4("mv", &mv.cell[0]);
+        program.SetUniformMatrix3("mvNormal", &mvNormal.cell[0]);
+        
+        program.SetUniform3("lightPosition", &lightPositionView[0]);
+        program.SetUniform1("lightIntensity", &lightIntensity);
+        program.SetUniform1("lightAmbientIntensity", &lightAmbientIntensity);
+        
+        texDiffuse.Bind(texDiffuseUnit);
+        program.SetUniform("mapKd", texDiffuseUnit);
+        texSpecular.Bind(texSpecularUnit);
+        program.SetUniform("mapKs", texSpecularUnit);
+        texSpecular.Bind(texAmbientUnit);
+        program.SetUniform("mapKa", texAmbientUnit);
+        
+        program.SetUniform1("mtl_Ns", &mesh.M(0).Ns);
+        program.SetUniform3("mtl_Ka", &mesh.M(0).Ka[0]);
+        program.SetUniform3("mtl_Kd", &mesh.M(0).Kd[0]);
+        program.SetUniform3("mtl_Ks", &mesh.M(0).Ks[0]);
+        
         glBindVertexArray(vao);
-        //glDrawArrays(GL_POINTS, 0, mesh.NV());
-        glDrawElements(GL_POINTS, mesh.NF()*3, GL_UNSIGNED_INT, 0);
+        glDrawArrays(GL_TRIANGLES, 0, static_cast<int>(positions.size()) );
         glBindVertexArray(0);
 
         /* Display Final Render */
@@ -302,4 +397,3 @@ int main(int argc, char** argv)
     glfwTerminate();
     return 0;
 }
-
