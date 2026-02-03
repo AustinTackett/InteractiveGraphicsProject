@@ -293,8 +293,6 @@ int main(int argc, char** argv)
     texAmbient.SetImage<unsigned char>(&diffuseTextureData[0], 4, diffuseTextureWidth, diffuseTextureHeight);
     texAmbient.BuildMipmaps();
 
-    
-
     /* Data on Scene */
     OrbitalObject camera;
     OrbitalObject light;
