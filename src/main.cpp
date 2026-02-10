@@ -219,9 +219,9 @@ int main(int argc, char** argv)
     }
 
     /* Write Mesh to GPU */
-    std::vector<cy::Vec3f> positions( mesh.NF()*3 );
-    std::vector<cy::Vec3f> normals( mesh.NF()*3 );
-    std::vector<cy::Vec3f> uvs( mesh.NF()*3 );
+    std::vector<cy::Vec3f> positions;
+    std::vector<cy::Vec3f> normals;
+    std::vector<cy::Vec3f> uvs;
 
     // For each face find the vertices, normals, and uvs and put them in lists ordered by face index
     for (unsigned int faceIndex = 0; faceIndex < mesh.NF(); faceIndex++)
@@ -296,12 +296,13 @@ int main(int argc, char** argv)
     /* Data on Scene */
     OrbitalObject camera;
     OrbitalObject light;
+    light.update(0, -deg2Rad(70), 0);
 
     float fovRadians = deg2Rad(75);
     float zFar = 1000;
     float zNear = 0.1f;
 
-    float lightIntensity = 1.0f;
+    float lightIntensity = 0.9f;
     float lightAmbientIntensity = 0.1f;
 
     /* Execute GLFW Window */
@@ -339,16 +340,14 @@ int main(int argc, char** argv)
         camera.update(phiDelta, thetaDelta, radiusDelta);
         cy::Matrix4f viewMatrix = camera.getViewMatrix();
         
+        float cameraThetaDelta = 0.0f;
+        float cameraPhiDelta = 0.0f;
         if (UserIO::leftMouseHeld && UserIO::controlPressed) 
         {
-            thetaDelta = static_cast<float>(UserIO::yRelativeMousePosDelta)*(2*cy::Pi<float>());
-            phiDelta = static_cast<float>(UserIO::xRelativeMousePosDelta)*(2*cy::Pi<float>());
+            cameraThetaDelta = static_cast<float>(UserIO::yRelativeMousePosDelta)*(2*cy::Pi<float>());
+            cameraPhiDelta = static_cast<float>(UserIO::xRelativeMousePosDelta)*(2*cy::Pi<float>());
         }
-        if (UserIO::rightMouseHeld && UserIO::controlPressed)
-        {
-            radiusDelta = static_cast<float>(UserIO::yRelativeMousePosDelta);
-        }        
-        light.update(phiDelta, thetaDelta, radiusDelta);
+        light.update(cameraPhiDelta, cameraThetaDelta, 0);
 
         // Perspective Matrix
         float aspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
@@ -375,7 +374,7 @@ int main(int argc, char** argv)
         program.SetUniform("mapKd", texDiffuseUnit);
         texSpecular.Bind(texSpecularUnit);
         program.SetUniform("mapKs", texSpecularUnit);
-        texSpecular.Bind(texAmbientUnit);
+        texAmbient.Bind(texAmbientUnit);
         program.SetUniform("mapKa", texAmbientUnit);
         
         program.SetUniform1("mtl_Ns", &mesh.M(0).Ns);

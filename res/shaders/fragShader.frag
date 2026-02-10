@@ -21,9 +21,7 @@ out vec4 fColor;
 
 void main()
 {
-    //vec3 Kd = mtl_Kd;
-    //vec3 Ka = mtl_Ka;
-    //vec3 Ks = mtl_Ks;
+    vec3 normal = normalize(vNormal);
 
     vec3 Kd = texture(mapKd, vUv.xy).rgb;
     vec3 Ks = texture(mapKs, vUv.xy).rgb;
@@ -33,17 +31,13 @@ void main()
     vec3 viewDirection = normalize(-vPosition);
     vec3 halfVector = normalize(viewDirection + lightDir);
 
-    float geometryTerm = max(dot(lightDir, vNormal), 0.0);
-    float specularTerm = max(dot(halfVector, vNormal), 0.0);
+    float geometryTerm = max(dot(lightDir, normal), 0.0);
+    float specularTerm = max(dot(halfVector, normal), 0.0);
 
     bool inShadow = geometryTerm <= 0;
 
-    vec3 litColorDirect;
-    if (inShadow)
-    {
-        litColorDirect = lightIntensity * (geometryTerm*Kd);        
-    }
-    else
+    vec3 litColorDirect = vec3(0, 0, 0);
+    if (!inShadow)
     {
         litColorDirect = lightIntensity * (geometryTerm*Kd + Ks*pow(specularTerm, mtl_Ns));
     }

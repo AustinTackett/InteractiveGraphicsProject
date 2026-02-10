@@ -10,7 +10,7 @@ layout (location = 2) in vec3 aUv;
 
 out vec3 vPosition;
 out vec3 vNormal;
-out vec3 vLightPos;
+out vec3 vLightPositionWorld;
 out vec3 vUv;
 
 void main()
